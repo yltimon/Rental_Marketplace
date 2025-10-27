@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   try {
     // Create a mock request object for multer
     const formData = await req.formData();
-    const file = formData.get("imageUrl") as File;
+    const file = formData.get("image") as File;
     
     if (!file) {
       return NextResponse.json(

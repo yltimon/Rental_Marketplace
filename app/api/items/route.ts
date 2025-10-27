@@ -1,12 +1,16 @@
+import { Item, User } from "@/lib/models";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
-import { Item } from "@/models/item";
+
 
 // Handle GET requests to fetch all items
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    const items = await Item.find().populate('owner', 'name email');
+
+    const ownerId = req.nextUrl.searchParams.get("owner");
+    const query = ownerId ? { owner: ownerId } : {};
+    const items = await Item.find(query).populate('owner', 'name email');
     return NextResponse.json(items, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch items:", error);
@@ -16,6 +20,9 @@ export async function GET() {
     );
   }
 }
+
+
+
 
 // Handle POST requests to create a new item
 export async function POST(req: NextRequest) {
@@ -45,3 +52,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

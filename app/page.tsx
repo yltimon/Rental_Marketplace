@@ -1,9 +1,11 @@
-import { AuthForm } from "@/components/auth/page";
+import Dashboard from "./dashboard/page";
+
 
 export default function Home() {
   return (
     <div>
-      <AuthForm mode="login" />
+      <Dashboard />
+
     </div>
   );
 }
