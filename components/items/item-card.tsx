@@ -5,6 +5,7 @@ import { useState } from 'react';
 import {Star, MapPin } from "lucide-react"
 import { useRouter, useParams } from 'next/navigation';
 import { useCreateBooking } from '@/hooks/use-bookings'
+import Link from 'next/link';
 
 interface ItemCardProps {
   item: {
@@ -14,7 +15,7 @@ interface ItemCardProps {
     price: number
     category: string
     location: string
-    rating: number
+    averageRating: number
     reviewCount: number
     image: string
     available: boolean
@@ -196,11 +197,19 @@ export function ItemCard({ item }: ItemCardProps) {
 
         {/* Rating */}
         <div className="flex items-center mb-3">
-          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-          <span className="text-sm font-medium mr-1">{item.rating.toFixed(1)}</span>
-          <span className="text-sm text-gray-500">
-            ({item.reviewCount} reviews)
-          </span>
+          <Link 
+            href={`/reviews/${item.id}`}
+            className="flex items-center mb-3 group cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded-lg transition-colors"
+          >
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+            <span className="text-sm font-medium mr-1">{Number.isFinite(item.averageRating) ? item.averageRating.toFixed(1) : '—'}</span>
+            <span className="text-sm text-gray-500 group-hover:text-blue-600 transition-colors">
+              ({item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'})
+            </span>
+            <span className="ml-1 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+              → View all
+            </span>
+          </Link>
         </div>
 
         {/* Owner */}

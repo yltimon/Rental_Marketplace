@@ -20,7 +20,7 @@ export interface Booking {
   startDate: string;
   endDate: string;
   totalPrice: number;
-  status: 'pending' | 'pending payment' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'pending payment' | 'paid' | 'cancelled';
   cancellationReason?: string;
   cancelledBy?: {
     _id: string;

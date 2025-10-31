@@ -24,14 +24,29 @@ export default function BookingsPage() {
   const [cancellationReason, setCancellationReason] = useState('');
   
   const { bookings, setBookings, loading, error } = useBookings({ status: statusFilter });
-  const { confirmBooking, cancelBooking, deleteBooking, loading: actionLoading, error: actionError } = useBookingActions(selectedBookingId);
+  const { 
+    confirmBooking, 
+    onRequestPayment, 
+    cancelBooking, 
+    deleteBooking, 
+    loading: actionLoading, 
+    error: actionError 
+  } = useBookingActions(selectedBookingId);
 
   const handleConfirm = async (bookingId: string) => {
     setSelectedBookingId(bookingId);
     const updated = await confirmBooking();
     
     if (updated) {
-      // Update the booking in the list
+      setBookings(prev => prev.map(b => b._id === bookingId ? updated : b));
+    }
+  };
+
+  const handleRequestPayment = async (bookingId: string) => {
+    setSelectedBookingId(bookingId);
+    const updated = await onRequestPayment();
+    
+    if (updated) {
       setBookings(prev => prev.map(b => b._id === bookingId ? updated : b));
     }
   };
@@ -62,6 +77,10 @@ export default function BookingsPage() {
     if (success) {
       setBookings(prev => prev.filter(b => b._id !== bookingId));
     }
+  };
+
+  const handlePayNow = (bookingId: string) => {
+    router.push(`/bookings/${bookingId}`); // Go to detail page where payment dialog is shown
   };
 
   const filterByStatus = (status?: string) => {
@@ -116,6 +135,9 @@ export default function BookingsPage() {
             <TabsTrigger value="pending-payment" onClick={() => filterByStatus('pending payment')}>
               Pending Payment
             </TabsTrigger>
+            <TabsTrigger value="paid" onClick={() => filterByStatus('paid')}>
+              Paid
+            </TabsTrigger>
             <TabsTrigger value="cancelled" onClick={() => filterByStatus('cancelled')}>
               Cancelled
             </TabsTrigger>
@@ -140,6 +162,8 @@ export default function BookingsPage() {
                     key={booking._id}
                     booking={booking}
                     onConfirm={() => handleConfirm(booking._id)}
+                    onRequestPayment={() => handleRequestPayment(booking._id)}
+                    onPayNow={() => handlePayNow(booking._id)}
                     onCancel={() => handleCancelClick(booking._id)}
                     onDelete={() => handleDelete(booking._id)}
                     onViewDetails={() => router.push(`/bookings/${booking._id}`)}
@@ -150,8 +174,8 @@ export default function BookingsPage() {
             )}
           </TabsContent>
 
-          {/* Other tab contents can show filtered results */}
-          {['pending', 'confirmed', 'pending-payment', 'cancelled'].map(status => (
+          {/* Other tab contents show filtered results */}
+          {['pending', 'confirmed', 'pending-payment', 'paid', 'cancelled'].map(status => (
             <TabsContent key={status} value={status} className="space-y-4">
               <div className="grid gap-4">
                 {bookings.map(booking => (
@@ -159,6 +183,8 @@ export default function BookingsPage() {
                     key={booking._id}
                     booking={booking}
                     onConfirm={() => handleConfirm(booking._id)}
+                    onRequestPayment={() => handleRequestPayment(booking._id)}
+                    onPayNow={() => handlePayNow(booking._id)}
                     onCancel={() => handleCancelClick(booking._id)}
                     onDelete={() => handleDelete(booking._id)}
                     onViewDetails={() => router.push(`/bookings/${booking._id}`)}

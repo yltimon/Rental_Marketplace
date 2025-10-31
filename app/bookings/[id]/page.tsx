@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useBooking } from '@/hooks/use-bookings';
 import { useBookingActions } from '@/hooks/use-booking-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,19 +11,23 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getUserId, getUserRole } from '@/lib/auth-utils';
 
 export default function BookingDetailPage() {
 
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const bookingId = params.id as string;
+  const paymentSuccess = searchParams.get('payment') === 'success';
   
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   
   const { booking, setBooking, loading, error } = useBooking(bookingId);
-  const { confirmBooking, setPendingPayment, cancelBooking, deleteBooking, loading: actionLoading, error: actionError } = useBookingActions(bookingId);
+  const { confirmBooking, onRequestPayment, onPayNow ,cancelBooking, deleteBooking, loading: actionLoading, error: actionError } = useBookingActions(bookingId);
 
   const currentUserId = getUserId();
   const userRole = getUserRole();
@@ -34,7 +38,7 @@ export default function BookingDetailPage() {
   };
 
   const handleSetPendingPayment = async () => {
-    const updated = await setPendingPayment();
+    const updated = await onRequestPayment();
     if (updated) setBooking(updated);
   };
 
@@ -59,8 +63,16 @@ export default function BookingDetailPage() {
     }
   };
 
-  const handlePaymentDarajaAPI = async () => {
-    // Placeholder for payment integration logic
+  const handleSimulatedPayment = async () => {
+    const updated = await onPayNow();
+    if (updated) {
+      setBooking(updated)
+      setShowPaymentDialog(false);
+      // Show success message
+      setTimeout(() => {
+        router.push(`/bookings/${bookingId}?payment=success`);
+      }, 100);
+    };
   };
 
   const formatDate = (dateString: string) => {
@@ -125,6 +137,14 @@ export default function BookingDetailPage() {
             Back to Bookings
           </Button>
         </div>
+        {/* Payment Success Alert */}
+        {paymentSuccess && (
+          <Alert className="mb-4 border-green-500 bg-green-50">
+            <AlertDescription className="text-green-800">
+              <strong>Payment Successful!</strong> Your booking is now confirmed and paid.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {actionError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
@@ -278,7 +298,7 @@ export default function BookingDetailPage() {
                 {/* Pending Payment geting filled */}
                 {isRenter && booking.status === 'pending payment' && (
                   <Button 
-                    onClick={handlePaymentDarajaAPI}
+                    onClick={handleSimulatedPayment}
                     disabled={actionLoading}
                   >
                     Make Payment
@@ -364,6 +384,67 @@ export default function BookingDetailPage() {
                 disabled={actionLoading || cancellationReason.length < 10}
               >
                 {actionLoading ? 'Cancelling...' : 'Confirm Cancellation'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Simulated Payment Dialog */}
+        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Simulated Payment</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Alert>
+                <AlertDescription>
+                   This is a <strong>simulated payment system</strong>. No real charges will be made.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold mb-3">Payment Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Item:</span>
+                    <span className="font-medium">{booking.item.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Rental Period:</span>
+                    <span className="font-medium">
+                      {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t font-bold text-lg">
+                    <span>Total:</span>
+                    <span className="text-green-600">${booking.totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg text-sm">
+                <p className="font-semibold text-blue-800 mb-2">Test Information:</p>
+                <ul className="list-disc list-inside space-y-1 text-blue-700">
+                  <li>2-second processing delay (simulated)</li>
+                  <li>10% chance of payment failure (for testing)</li>
+                  <li>Status will change to "paid" on success</li>
+                </ul>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowPaymentDialog(false)}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSimulatedPayment}
+                disabled={actionLoading}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {actionLoading ? 'Processing...' : `Pay $${booking.totalPrice.toFixed(2)}`}
               </Button>
             </DialogFooter>
           </DialogContent>

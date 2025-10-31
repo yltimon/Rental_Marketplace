@@ -8,6 +8,8 @@ import { getUserId } from "@/lib/auth-utils";
 interface BookingCardProps {
   booking: Booking;
   onConfirm?: () => void;
+  onRequestPayment?: () => void;
+  onPayNow?: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
   onViewDetails?: () => void;
@@ -17,6 +19,8 @@ interface BookingCardProps {
 export default function BookingCard({
   booking,
   onConfirm,
+  onRequestPayment,
+  onPayNow,
   onCancel,
   onDelete,
   onViewDetails,
@@ -46,6 +50,7 @@ export default function BookingCard({
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'confirmed': return 'bg-green-100 text-green-800';
       case 'pending payment': return 'bg-blue-100 text-blue-800';
+      case 'paid': return 'bg-emerald-100 text-emerald-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -99,18 +104,42 @@ export default function BookingCard({
             </Button>
           )}
 
-          {/* Owner Actions */}
+          {/* Owner: Confirm pending booking */}
           {isOwner && booking.status === 'pending' && onConfirm && (
             <Button 
               size="sm"
               onClick={onConfirm}
               disabled={loading}
             >
-              Confirm
+              Confirm Booking
             </Button>
           )}
 
-          {/* Cancellation - both can cancel */}
+          {/* Owner: Request payment after confirmation */}
+          {isOwner && booking.status === 'confirmed' && onRequestPayment && (
+            <Button 
+              size="sm"
+              variant="default"
+              onClick={onRequestPayment}
+              disabled={loading}
+            >
+              Request Payment
+            </Button>
+          )}
+
+          {/* Renter: Pay now button */}
+          {isRenter && booking.status === 'pending payment' && onPayNow && (
+            <Button 
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
+              onClick={onPayNow}
+              disabled={loading}
+            >
+              Pay ${booking.totalPrice.toFixed(2)}
+            </Button>
+          )}
+
+          {/* Cancellation - both can cancel (but not if paid) */}
           {(isOwner || isRenter) && 
            ['pending', 'confirmed', 'pending payment'].includes(booking.status) && 
            onCancel && (
@@ -135,6 +164,13 @@ export default function BookingCard({
             >
               Delete
             </Button>
+          )}
+
+          {/* Paid status indicator */}
+          {booking.status === 'paid' && (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">
+              Payment Completed
+            </Badge>
           )}
         </div>
       </CardContent>

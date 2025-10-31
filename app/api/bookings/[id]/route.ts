@@ -106,18 +106,19 @@ export async function PATCH(
                 await item.save();
             }
             
-            // CONFIRMED -> PENDING PAYMENT (Owner only, after confirmation)
+            // CONFIRMED -> PENDING PAYMENT (Owner only)
             else if (currentStatus === 'confirmed' && newStatus === 'pending payment') {
                 if (auth.userId !== itemOwnerId) {
                     return forbiddenResponse("Only the item owner can change payment status");
                 }
             }
             
-            // PENDING PAYMENT -> CONFIRMED (After payment - could be automated or manual)
+            // PENDING PAYMENT -> PAID (After successful payment - automated by payment API)
             else if (currentStatus === 'pending payment' && newStatus === 'confirmed') {
-                // Could be triggered by payment webhook or manual confirmation
-                if (auth.userId !== itemOwnerId && auth.userId !== renterId) {
-                    return forbiddenResponse("Only owner or renter can confirm payment");
+                // This transition should normally only happen through the payment API
+                // But we allow it here for manual admin corrections if needed
+                if (auth.userId !== renterId && auth.userId !== itemOwnerId) {
+                    return forbiddenResponse("Only renter or owner can mark as paid");
                 }
             }
             
@@ -140,14 +141,14 @@ export async function PATCH(
                 // Set cancelledBy to authenticated user
                 body.cancelledBy = auth.userId;
                 
-                // If booking was confirmed, make item available again
-                if (currentStatus === 'confirmed' || currentStatus === 'pending payment') {
+                // If booking was confirmed, paid, or pending payment, make item available again
+                if (['confirmed', 'pending payment', 'paid'].includes(currentStatus)) {
                     item.available = true;
                     await item.save();
                 }
                 
                 // Valid transitions to cancelled
-                const validCancellations = ['pending', 'confirmed', 'pending payment'];
+                const validCancellations = ['pending', 'confirmed', 'pending payment', 'paid'];
                 if (!validCancellations.includes(currentStatus)) {
                     return NextResponse.json(
                         { error: `Cannot cancel booking with status: ${currentStatus}` },

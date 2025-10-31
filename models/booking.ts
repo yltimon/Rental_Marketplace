@@ -6,7 +6,7 @@ const BookingSchema = new mongoose.Schema({
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     totalPrice: { type: Number, required: true },
-    status: { type: String, enum: ['pending', 'pending payment' ,'confirmed', 'cancelled'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'pending payment' , 'paid' ,'confirmed', 'cancelled'], default: 'pending' },
     cancellationReason: { type: String, required: function (this: any) { return this.status === 'cancelled'; } },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: function (this: any) { return this.status === 'cancelled'; } },
 }, { timestamps: true });

@@ -4,8 +4,9 @@ import { Review } from "@/models/review";
 import { Booking } from "@/models/booking";
 import { Item } from "@/models/item";
 import { User } from "@/models/user";
+import { verifyToken, unauthorizedResponse, forbiddenResponse } from "@/lib/auth-middleware";
 
-// Get all reviews, with optional filters for item or user
+// GET all reviews with optional filters
 export async function GET(req: NextRequest) {
     try {
         await connectToDatabase();
@@ -14,9 +15,9 @@ export async function GET(req: NextRequest) {
         const itemId = searchParams.get('item');
         const userId = searchParams.get('user');
 
-        let query = {};
-        if (itemId) query = { ...query, item: itemId};
-        if (userId) query = { ...query, reviewee: userId }
+        let query: any = {};
+        if (itemId) query.item = itemId;
+        if (userId) query.reviewee = userId;
 
         const reviews = await Review.find(query)
             .populate('reviewer', 'name email')
@@ -26,21 +27,30 @@ export async function GET(req: NextRequest) {
             
         return NextResponse.json(reviews, { status: 200 });
     } catch (error: any) {
+        console.error("Fetch reviews error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 
 
-// POST a new review
+// POST a new review (requires authentication and completed booking)
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
-    let { reviewer, reviewee, item, rating, comment } = await req.json();
+    
+    // Verify authentication
+    const auth = await verifyToken(req);
+    if (!auth) {
+        return unauthorizedResponse("Please log in to submit a review");
+    }
+
+    let { reviewee, item, rating, comment } = await req.json();
+    const reviewer = auth.userId; // Force reviewer to be authenticated user
 
     // Validate required fields
-    if (!reviewer || !rating) {
+    if (!rating) {
       return NextResponse.json(
-        { error: "Reviewer and rating are required." },
+        { error: "Rating is required." },
         { status: 400 }
       );
     }
@@ -55,24 +65,41 @@ export async function POST(req: NextRequest) {
 
     // Determine review type and validate permissions
     if (item && !reviewee) {
-      // CASE 1: Renter reviewing an item (auto-review owner)
+      // CASE 1: Renter reviewing an item (and owner)
+      if (auth.role !== 'renter') {
+        return forbiddenResponse("Only renters can review items");
+      }
+
+      // Verify renter has a completed booking for this item
       const booking = await Booking.findOne({ 
         renter: reviewer, 
         item,
-        status: 'confirmed'
+        status: 'paid'
       });
       
       if (!booking) {
         return NextResponse.json(
-          { error: "You can only review items you've successfully booked." },
+          { error: "You can only review items you've successfully rented." },
           { status: 403 }
         );
       }
       
       // Get item owner as reviewee
       const itemDoc = await Item.findById(item);
-      if (itemDoc) {
-        reviewee = itemDoc.owner;
+      if (!itemDoc) {
+        return NextResponse.json(
+          { error: "Item not found." },
+          { status: 404 }
+        );
+      }
+      reviewee = itemDoc.owner;
+
+      // Prevent reviewing your own item
+      if (reviewee.toString() === reviewer) {
+        return NextResponse.json(
+          { error: "You cannot review your own item." },
+          { status: 400 }
+        );
       }
 
       // Check for existing review for this item by this reviewer
@@ -86,46 +113,64 @@ export async function POST(req: NextRequest) {
 
     } else if (reviewee && !item) {
       // CASE 2: Owner reviewing a renter
-      // Find a confirmed booking where owner is reviewer and renter is reviewee
+      if (auth.role !== 'owner') {
+        return forbiddenResponse("Only owners can review renters");
+      }
+
+      // Find a confirmed booking where owner's item was rented by reviewee
+      const ownedItems = await Item.find({ owner: reviewer }).select('_id');
+      const itemIds = ownedItems.map(i => i._id);
+
       const booking = await Booking.findOne({ 
         renter: reviewee,
-        status: 'confirmed'
+        item: { $in: itemIds },
+        status: 'paid'
       }).populate('item');
       
       if (!booking) {
         return NextResponse.json(
-          { error: "No confirmed booking found for this renter." },
+          { error: "No paid booking found. You can only review renters who rented your items." },
           { status: 403 }
         );
       }
 
-      // Check if reviewer is the item owner
-      if (booking.item.owner.toString() !== reviewer) {
+      item = (booking.item as any)._id;
+
+      // Prevent self-review
+      if (reviewee.toString() === reviewer) {
         return NextResponse.json(
-          { error: "You can only review renters who booked your items." },
-          { status: 403 }
+          { error: "You cannot review yourself." },
+          { status: 400 }
         );
       }
-      
-      item = booking.item._id;
 
       // Check for existing review for this renter by this owner
-      const existingUserReview = await Review.findOne({ reviewer, reviewee });
+      const existingUserReview = await Review.findOne({ 
+        reviewer, 
+        reviewee,
+        item 
+      });
       if (existingUserReview) {
         return NextResponse.json(
-          { error: "You have already reviewed this renter." },
+          { error: "You have already reviewed this renter for this booking." },
           { status: 409 }
         );
       }
     } else {
       return NextResponse.json(
-        { error: "Must specify either item (for item reviews) or reviewee (for user reviews)." },
+        { error: "Must specify either item (for item/owner reviews) or reviewee (for renter reviews)." },
         { status: 400 }
       );
     }
 
     // Create the review
-    const review = new Review({ reviewer, reviewee, item, rating, comment });
+    const review = new Review({ 
+      reviewer, 
+      reviewee, 
+      item, 
+      rating, 
+      comment: comment || "" 
+    });
     await review.save();
     
     // Update average ratings
