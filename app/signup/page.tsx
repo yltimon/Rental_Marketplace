@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff, Mail, Lock, User, Users, Store, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,8 @@ export default function Signup() {
     role: "renter" // "renter" or "owner"
   })
 
+  const router = useRouter();
+
   if (!open) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,13 +39,15 @@ export default function Signup() {
       const data = await response.json()
       if (!response.ok) {
         console.log('Signup failed:', data.error)
+        alert(data.error || 'Signup failed. Please try again.')
         return
       } else {
         localStorage.setItem("token", data.token)
         localStorage.setItem("role", data.user.role)
         localStorage.setItem("name", data.user.name)
         localStorage.setItem("userId", data.user._id);
-        window.location.href = "/"
+        window.dispatchEvent(new Event("authChange"))
+        router.push("/")
       }
       setOpen(false)
 
